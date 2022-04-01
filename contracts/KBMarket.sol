@@ -6,9 +6,13 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 // security against transactions for multiple requests
 import "hardhat/console.sol";
+import "./OurToken.sol";
+import "./NFT.sol";
 
 contract KBMarket is ReentrancyGuard {
     using Counters for Counters.Counter;
+
+    OurToken private ourtoken;
 
     /* number of items minting, number of transactions, tokens that have not been sold
      keep track of tokens total number - tokenId
@@ -26,9 +30,15 @@ contract KBMarket is ReentrancyGuard {
     // 0.045 is in the cents
     uint256 listingPrice = 0.045 ether;
 
-    constructor() {
+    modifier isMyToken(address _token) {
+        require(_token == address(ourtoken), "Not my token");
+        _;
+    }
+
+    constructor(address tokenaddress) {
         //set the owner
         owner = payable(msg.sender);
+        ourtoken = OurToken(tokenaddress);
     }
 
     // structs can act like objects
@@ -112,25 +122,18 @@ contract KBMarket is ReentrancyGuard {
 
     function createMarketSale(address nftContract, uint256 itemId)
         public
-        payable
         nonReentrant
     {
         uint256 price = idToMarketToken[itemId].price;
+        uint256 value = price * (10**ERC20(ourtoken).decimals());
         uint256 tokenId = idToMarketToken[itemId].tokenId;
-        require(
-            msg.value == price,
-            "Please submit the asking price in order to continue"
-        );
 
         // transfer the amount to the seller
-        idToMarketToken[itemId].seller.transfer(msg.value);
-        // transfer the token from contract address to the buyer
+        ERC20(ourtoken).transferFrom(msg.sender, address(this), value);
         IERC721(nftContract).transferFrom(address(this), msg.sender, tokenId);
-        idToMarketToken[itemId].owner = payable(msg.sender);
-        idToMarketToken[itemId].sold = true;
         _tokensSold.increment();
 
-        payable(owner).transfer(listingPrice);
+        //payable(owner).transfer(listingPrice);
     }
 
     // function to fetchMarketItems - minting, buying ans selling
