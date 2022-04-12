@@ -27,7 +27,7 @@ export default function Home() {
     await provider.send("eth_requestAccounts", []);
     const tokenContract = new ethers.Contract(nftaddress, NFT.abi, provider)
     const marketContract = new ethers.Contract(nftmarketaddress, KBMarket.abi, provider)
-    const data = await marketContract.fetchMarketTokens()
+    const data = await marketContract.fetchAvailableMarketItems()
 
     const items = await Promise.all(data.map(async i => {
       const tokenUri = await tokenContract.tokenURI(i.tokenId)
@@ -56,22 +56,17 @@ export default function Home() {
     try {
       const web3Modal = new Web3Modal()
       const connection = await web3Modal.connect()
-      const provider = new providers.Web3Provider(window.ethereum)
+      const price = ethers.utils.parseUnits(nft.price.toString(), 'ether')
+      const provider = new ethers.providers.Web3Provider(connection, 'any')
       await provider.send("eth_requestAccounts", []);
       const signer = provider.getSigner()
       console.log(signer)
-      const contract = new ethers.Contract(nftmarketaddress, KBMarket.abi, signer)
-
-      const price = ethers.utils.parseUnits(nft.price.toString(), 'ether')
       const token = new ethers.Contract(tokenaddress, OurToken.abi, signer)
-      await token.approve(nftmarketaddress, ethers.utils.parseEther(nft.price.toString()))
-      console.log(nft.price.toString())
-      const signerAddress = await signer.getAddress()
-      console.log(signerAddress)
-      console.log((await token.balanceOf(signerAddress)).toString())
-      const transaction = await contract.createMarketSale(nftaddress, nft.tokenId)
-
-      await transaction.wait()
+      const transaction1 = await token.approve(nftmarketaddress, price)
+      await transaction1.wait()
+      const market = new ethers.Contract(nftmarketaddress, KBMarket.abi, signer)
+      const transaction2 = await market.createMarketSale(nftaddress, tokenaddress, nft.tokenId)
+      await transaction2.wait()
       loadNFTs()
     } catch (err) { console.log(err) }
 

@@ -1,37 +1,85 @@
-//SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
-
-// we will bring in the openzeppelin ERC721 NFT functionality
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 
+// TO DO: Explain the reason/advantadge to use ERC721URIStorage instead of ERC721 itself
 contract NFT is ERC721URIStorage {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
-    // counters allow us to keep track of tokenIds
 
-    // address of marketplace for NFTs to interact
-    address contractAddress;
+    address private marketplaceAddress;
+    mapping(uint256 => address) private _creators;
 
-    // OBJ: give the NFT market the ability to transact with tokens or change ownership
-    // setApprovalForAll allows us to do that with contract address
+    event TokenMinted(
+        uint256 indexed tokenId,
+        string tokenURI,
+        address marketplaceAddress
+    );
 
-    // constructor set up our address
-    constructor(address marketplaceAddress) ERC721("KryptoBirdz", "KBIRDZ") {
-        contractAddress = marketplaceAddress;
+    constructor(address _marketplaceAddress) ERC721("KryptoBirdz", "KBIRDZ") {
+        marketplaceAddress = _marketplaceAddress;
     }
 
     function mintToken(string memory tokenURI) public returns (uint256) {
         _tokenIds.increment();
         uint256 newItemId = _tokenIds.current();
         _mint(msg.sender, newItemId);
-        // set the token URI: id and url
+        _creators[newItemId] = msg.sender;
         _setTokenURI(newItemId, tokenURI);
-        // give the marketplace the approval to transact between users
-        setApprovalForAll(contractAddress, true);
-        // mint the token and set it for sale - return the id to do so
+
+        // Give the marketplace approval to transact NFTs between users
+        setApprovalForAll(marketplaceAddress, true);
+
+        emit TokenMinted(newItemId, tokenURI, marketplaceAddress);
         return newItemId;
+    }
+
+    function getTokensOwnedByMe() public view returns (uint256[] memory) {
+        uint256 numberOfExistingTokens = _tokenIds.current();
+        uint256 numberOfTokensOwned = balanceOf(msg.sender);
+        uint256[] memory ownedTokenIds = new uint256[](numberOfTokensOwned);
+
+        uint256 currentIndex = 0;
+        for (uint256 i = 0; i < numberOfExistingTokens; i++) {
+            uint256 tokenId = i + 1;
+            if (ownerOf(tokenId) != msg.sender) continue;
+            ownedTokenIds[currentIndex] = tokenId;
+            currentIndex += 1;
+        }
+
+        return ownedTokenIds;
+    }
+
+    function getTokenCreatorById(uint256 tokenId)
+        public
+        view
+        returns (address)
+    {
+        return _creators[tokenId];
+    }
+
+    function getTokensCreatedByMe() public view returns (uint256[] memory) {
+        uint256 numberOfExistingTokens = _tokenIds.current();
+        uint256 numberOfTokensCreated = 0;
+
+        for (uint256 i = 0; i < numberOfExistingTokens; i++) {
+            uint256 tokenId = i + 1;
+            if (_creators[tokenId] != msg.sender) continue;
+            numberOfTokensCreated += 1;
+        }
+
+        uint256[] memory createdTokenIds = new uint256[](numberOfTokensCreated);
+        uint256 currentIndex = 0;
+        for (uint256 i = 0; i < numberOfExistingTokens; i++) {
+            uint256 tokenId = i + 1;
+            if (_creators[tokenId] != msg.sender) continue;
+            createdTokenIds[currentIndex] = tokenId;
+            currentIndex += 1;
+        }
+
+        return createdTokenIds;
     }
 }

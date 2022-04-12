@@ -1,12 +1,13 @@
-import { ethers } from 'ethers'
+import { ethers, BigNumber } from 'ethers'
 import { useState } from 'react'
 import Web3Modal from 'web3modal'
 import { create as ipfsHttpClient } from 'ipfs-http-client'
 import {
-    nftaddress, nftmarketaddress
+    nftaddress, nftmarketaddress, tokenaddress
 } from '../config'
 import NFT from '../artifacts/contracts/NFT.sol/NFT.json'
 import KBMarket from '../artifacts/contracts/KBMarket.sol/KBMarket.json'
+import OurToken from '../artifacts/contracts/OurToken.sol/OurToken.json'
 import { useRouter } from 'next/router'
 
 // in this component we set the ipfs up to host our nft data of
@@ -18,6 +19,7 @@ export default function MintItem() {
     const [fileUrl, setFileUrl] = useState(null)
     const [formInput, updateFormInput] = useState({ price: '', name: '', description: '' })
     const router = useRouter()
+    const [newPrice, setPrice] = useState(0)
 
     // set up a function to fireoff when we update files in our form - we can addd our
     // NFT images - IPFS
@@ -67,15 +69,17 @@ export default function MintItem() {
         let event = tx.events[0]
         let value = event.args[2]
         let tokenId = value.toNumber()
-        const price = ethers.utils.parseUnits(formInput.price, 'ether')
+        console.log(tokenId)
 
 
         // list the item for sale on the marketplace
         contract = new ethers.Contract(nftmarketaddress, KBMarket.abi, signer)
-        let listingPrice = await contract.getListingPrice()
-        listingPrice = listingPrice.toString()
-
-        transaction = await contract.makeMarketItem(nftaddress, tokenId, price, { value: listingPrice })
+        const token = new ethers.Contract(tokenaddress, OurToken.abi, signer)
+        const price = ethers.utils.parseUnits(formInput.price, 'ether')
+        const listingFee = await contract.getListingFee()
+        const transaction1 = await token.approve(nftmarketaddress, listingFee)
+        await transaction1.wait()
+        transaction = await contract.makeMarketItem(nftaddress, tokenaddress, listingFee, tokenId, price)
         await transaction.wait()
         router.push('./')
     }

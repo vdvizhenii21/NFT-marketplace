@@ -1,217 +1,322 @@
-//SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "./NFT.sol";
+import "./OurToken.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
-// security against transactions for multiple requests
-import "hardhat/console.sol";
-import "./OurToken.sol";
-import "./NFT.sol";
 
 contract KBMarket is ReentrancyGuard {
     using Counters for Counters.Counter;
 
-    OurToken private ourtoken;
-
-    /* number of items minting, number of transactions, tokens that have not been sold
-     keep track of tokens total number - tokenId
-     arrays need to know the length - help to keep track for arrays */
-
-    Counters.Counter private _tokenIds;
+    Counters.Counter private _marketItemIds;
     Counters.Counter private _tokensSold;
+    Counters.Counter private _tokensCanceled;
 
-    // determine who is the owner of the contract
-    // charge a listing fee so the owner makes a commission
+    address payable private owner;
 
-    address payable owner;
-    // we are deploying to matic the API is the same so you can use ether the same as matic
-    // they both have 18 decimal
-    // 0.045 is in the cents
-    uint256 listingPrice = 0.045 ether;
+    uint256 private listingFee = 0.045 ether;
 
-    modifier isMyToken(address _token) {
-        require(_token == address(ourtoken), "Not my token");
-        _;
-    }
+    mapping(uint256 => MarketItem) private marketItemIdToMarketItem;
 
-    constructor(address tokenaddress) {
-        //set the owner
-        owner = payable(msg.sender);
-        ourtoken = OurToken(tokenaddress);
-    }
-
-    // structs can act like objects
-
-    struct MarketToken {
-        uint256 itemId;
-        address nftContract;
+    struct MarketItem {
+        uint256 marketItemId;
+        address nftContractAddress;
         uint256 tokenId;
+        address payable creator;
         address payable seller;
         address payable owner;
         uint256 price;
         bool sold;
+        bool canceled;
     }
 
-    // tokenId return which MarketToken -  fetch which one it is
-
-    mapping(uint256 => MarketToken) private idToMarketToken;
-
-    // listen to events from front end applications
-    event MarketTokenMinted(
-        uint256 indexed itemId,
+    event MarketItemCreated(
+        uint256 indexed marketItemId,
         address indexed nftContract,
         uint256 indexed tokenId,
+        address creator,
         address seller,
         address owner,
         uint256 price,
-        bool sold
+        bool sold,
+        bool canceled
     );
 
-    // get the listing price
-    function getListingPrice() public view returns (uint256) {
-        return listingPrice;
+    constructor() {
+        owner = payable(msg.sender);
     }
 
-    // two functions to interact with contract
-    // 1. create a market item to put it up for sale
-    // 2. create a market sale for buying and selling between parties
+    function getListingFee() public view returns (uint256) {
+        return listingFee;
+    }
 
+    /**
+     * @dev Creates a market item listing, requiring a listing fee and transfering the NFT token from
+     * msg.sender to the marketplace contract.
+     */
     function makeMarketItem(
-        address nftContract,
+        address nftContractAddress,
+        address erc20ContractAddress,
+        uint256 feeAmount,
         uint256 tokenId,
         uint256 price
-    ) public payable nonReentrant {
-        // nonReentrant is a modifier to prevent reentry attack
-
-        require(price > 0, "Price must be at least one wei");
+    ) public payable nonReentrant returns (uint256) {
+        require(price > 0, "Price must be at least 1 wei");
         require(
-            msg.value == listingPrice,
+            feeAmount == listingFee,
             "Price must be equal to listing price"
         );
+        _marketItemIds.increment();
+        uint256 marketItemId = _marketItemIds.current();
 
-        _tokenIds.increment();
-        uint256 itemId = _tokenIds.current();
+        address creator = NFT(nftContractAddress).getTokenCreatorById(tokenId);
 
-        //putting it up for sale - bool - no owner
-        idToMarketToken[itemId] = MarketToken(
-            itemId,
-            nftContract,
+        marketItemIdToMarketItem[marketItemId] = MarketItem(
+            marketItemId,
+            nftContractAddress,
             tokenId,
+            payable(creator),
             payable(msg.sender),
             payable(address(0)),
             price,
+            false,
             false
         );
 
-        // NFT transaction
-        IERC721(nftContract).transferFrom(msg.sender, address(this), tokenId);
-
-        emit MarketTokenMinted(
-            itemId,
-            nftContract,
-            tokenId,
+        OurToken(erc20ContractAddress).transferFrom(
             msg.sender,
-            address(0),
+            address(this),
+            listingFee
+        );
+        IERC721(nftContractAddress).transferFrom(
+            msg.sender,
+            address(this),
+            tokenId
+        );
+
+        emit MarketItemCreated(
+            marketItemId,
+            nftContractAddress,
+            tokenId,
+            payable(creator),
+            payable(msg.sender),
+            payable(address(0)),
             price,
+            false,
             false
         );
+
+        return marketItemId;
     }
 
-    // function to conduct transactions and market sales
-
-    function createMarketSale(address nftContract, uint256 itemId)
+    /**
+     * @dev Cancel a market item
+     */
+    function cancelMarketItem(address nftContractAddress, uint256 marketItemId)
         public
+        payable
         nonReentrant
     {
-        uint256 price = idToMarketToken[itemId].price;
-        uint256 value = price * (10**ERC20(ourtoken).decimals());
-        uint256 tokenId = idToMarketToken[itemId].tokenId;
+        uint256 tokenId = marketItemIdToMarketItem[marketItemId].tokenId;
+        require(tokenId > 0, "Market item has to exist");
 
-        // transfer the amount to the seller
-        ERC20(ourtoken).transferFrom(msg.sender, address(this), value);
-        IERC721(nftContract).transferFrom(address(this), msg.sender, tokenId);
+        require(
+            marketItemIdToMarketItem[marketItemId].seller == msg.sender,
+            "You are not the seller"
+        );
+
+        IERC721(nftContractAddress).transferFrom(
+            address(this),
+            msg.sender,
+            tokenId
+        );
+
+        marketItemIdToMarketItem[marketItemId].owner = payable(msg.sender);
+        marketItemIdToMarketItem[marketItemId].canceled = true;
+
+        _tokensCanceled.increment();
+    }
+
+    /**
+     * @dev Get Latest Market Item by the token id
+     */
+    function getLatestMarketItemByTokenId(uint256 tokenId)
+        public
+        view
+        returns (MarketItem memory, bool)
+    {
+        uint256 itemsCount = _marketItemIds.current();
+
+        for (uint256 i = itemsCount; i > 0; i--) {
+            MarketItem memory item = marketItemIdToMarketItem[i];
+            if (item.tokenId != tokenId) continue;
+            return (item, true);
+        }
+
+        // What is the best practice for returning a "null" value in solidity?
+        // Reverting does't seem to be the best approach as it would throw an error on frontend
+        MarketItem memory emptyMarketItem;
+        return (emptyMarketItem, false);
+    }
+
+    /**
+     * @dev Creates a market sale by transfering msg.sender money to the seller and NFT token from the
+     * marketplace to the msg.sender. It also sends the listingFee to the marketplace owner.
+     */
+    function createMarketSale(
+        address nftContractAddress,
+        address erc20ContractAddress,
+        uint256 marketItemId
+    ) public payable nonReentrant {
+        uint256 price = marketItemIdToMarketItem[marketItemId].price;
+        uint256 tokenId = marketItemIdToMarketItem[marketItemId].tokenId;
+
+        marketItemIdToMarketItem[marketItemId].owner = payable(msg.sender);
+        marketItemIdToMarketItem[marketItemId].sold = true;
+
+        OurToken(erc20ContractAddress).transferFrom(
+            msg.sender,
+            address(this),
+            price
+        );
+        IERC721(nftContractAddress).transferFrom(
+            address(this),
+            msg.sender,
+            tokenId
+        );
+
         _tokensSold.increment();
 
-        //payable(owner).transfer(listingPrice);
+        OurToken(erc20ContractAddress).transfer(owner, listingFee);
     }
 
-    // function to fetchMarketItems - minting, buying ans selling
-    // return the number of unsold items
+    /**
+     * @dev Fetch non sold and non canceled market items
+     */
+    function fetchAvailableMarketItems()
+        public
+        view
+        returns (MarketItem[] memory)
+    {
+        uint256 itemsCount = _marketItemIds.current();
+        uint256 soldItemsCount = _tokensSold.current();
+        uint256 canceledItemsCount = _tokensCanceled.current();
+        uint256 availableItemsCount = itemsCount -
+            soldItemsCount -
+            canceledItemsCount;
+        MarketItem[] memory marketItems = new MarketItem[](availableItemsCount);
 
-    function fetchMarketTokens() public view returns (MarketToken[] memory) {
-        uint256 itemCount = _tokenIds.current();
-        uint256 unsoldItemCount = _tokenIds.current() - _tokensSold.current();
         uint256 currentIndex = 0;
-
-        // looping over the number of items created (if number has not been sold populate the array)
-        MarketToken[] memory items = new MarketToken[](unsoldItemCount);
-        for (uint256 i = 0; i < itemCount; i++) {
-            if (idToMarketToken[i + 1].owner == address(0)) {
-                uint256 currentId = i + 1;
-                MarketToken storage currentItem = idToMarketToken[currentId];
-                items[currentIndex] = currentItem;
-                currentIndex += 1;
-            }
+        for (uint256 i = 0; i < itemsCount; i++) {
+            // Is this refactor better than the original implementation?
+            // https://github.com/dabit3/polygon-ethereum-nextjs-marketplace/blob/main/contracts/Market.sol#L111
+            // If so, is it better to use memory or storage here?
+            MarketItem memory item = marketItemIdToMarketItem[i + 1];
+            if (item.owner != address(0)) continue;
+            marketItems[currentIndex] = item;
+            currentIndex += 1;
         }
-        return items;
+
+        return marketItems;
     }
 
-    // return nfts that the user has purchased
+    /**
+     * @dev This seems to be the best way to compare strings in Solidity
+     */
+    function compareStrings(string memory a, string memory b)
+        private
+        pure
+        returns (bool)
+    {
+        return (keccak256(abi.encodePacked((a))) ==
+            keccak256(abi.encodePacked((b))));
+    }
 
-    function fetchMyNFTs() public view returns (MarketToken[] memory) {
-        uint256 totalItemCount = _tokenIds.current();
-        // a second counter for each individual user
+    /**
+     * @dev Since we can't access structs properties dinamically, this function selects the address
+     * we're looking for between "owner" and "seller"
+     */
+    function getMarketItemAddressByProperty(
+        MarketItem memory item,
+        string memory property
+    ) private pure returns (address) {
+        require(
+            compareStrings(property, "seller") ||
+                compareStrings(property, "owner"),
+            "Parameter must be 'seller' or 'owner'"
+        );
+
+        return compareStrings(property, "seller") ? item.seller : item.owner;
+    }
+
+    /**
+     * @dev Fetch market items that are being listed by the msg.sender
+     */
+    function fetchSellingMarketItems()
+        public
+        view
+        returns (MarketItem[] memory)
+    {
+        return fetchMarketItemsByAddressProperty("seller");
+    }
+
+    /**
+     * @dev Fetch market items that are owned by the msg.sender
+     */
+    function fetchOwnedMarketItems() public view returns (MarketItem[] memory) {
+        return fetchMarketItemsByAddressProperty("owner");
+    }
+
+    /**
+     * @dev Fetches market items according to the its requested address property that
+     * can be "owner" or "seller". The original implementations were two functions that were
+     * almost the same, changing only a property access. This refactored version requires an
+     * addional auxiliary function, but avoids repeating code.
+     * See original: https://github.com/dabit3/polygon-ethereum-nextjs-marketplace/blob/main/contracts/Market.sol#L121
+     */
+    function fetchMarketItemsByAddressProperty(string memory _addressProperty)
+        public
+        view
+        returns (MarketItem[] memory)
+    {
+        require(
+            compareStrings(_addressProperty, "seller") ||
+                compareStrings(_addressProperty, "owner"),
+            "Parameter must be 'seller' or 'owner'"
+        );
+        uint256 totalItemsCount = _marketItemIds.current();
         uint256 itemCount = 0;
         uint256 currentIndex = 0;
 
-        for (uint256 i = 0; i < totalItemCount; i++) {
-            if (idToMarketToken[i + 1].owner == msg.sender) {
-                itemCount += 1;
-            }
+        for (uint256 i = 0; i < totalItemsCount; i++) {
+            // Is it ok to assign this variable for better code legbility?
+            // Is it better to use memory or storage in this case?
+            MarketItem storage item = marketItemIdToMarketItem[i + 1];
+            address addressPropertyValue = getMarketItemAddressByProperty(
+                item,
+                _addressProperty
+            );
+            if (addressPropertyValue != msg.sender) continue;
+            itemCount += 1;
         }
 
-        // second loop to loop through the amount you have purchased with itemcount
-        // check to see if the owner address is equal to msg.sender
+        MarketItem[] memory items = new MarketItem[](itemCount);
 
-        MarketToken[] memory items = new MarketToken[](itemCount);
-        for (uint256 i = 0; i < totalItemCount; i++) {
-            if (idToMarketToken[i + 1].owner == msg.sender) {
-                uint256 currentId = idToMarketToken[i + 1].itemId;
-                // current array
-                MarketToken storage currentItem = idToMarketToken[currentId];
-                items[currentIndex] = currentItem;
-                currentIndex += 1;
-            }
-        }
-        return items;
-    }
-
-    // function for returning an array of minted nfts
-    function fetchItemsCreated() public view returns (MarketToken[] memory) {
-        // instead of .owner it will be the .seller
-        uint256 totalItemCount = _tokenIds.current();
-        uint256 itemCount = 0;
-        uint256 currentIndex = 0;
-
-        for (uint256 i = 0; i < totalItemCount; i++) {
-            if (idToMarketToken[i + 1].seller == msg.sender) {
-                itemCount += 1;
-            }
+        for (uint256 i = 0; i < totalItemsCount; i++) {
+            // Is it ok to assign this variable for better code legbility?
+            // Is it better to use memory or storage in this case?
+            MarketItem storage item = marketItemIdToMarketItem[i + 1];
+            address addressPropertyValue = getMarketItemAddressByProperty(
+                item,
+                _addressProperty
+            );
+            if (addressPropertyValue != msg.sender) continue;
+            items[currentIndex] = item;
+            currentIndex += 1;
         }
 
-        // second loop to loop through the amount you have purchased with itemcount
-        // check to see if the owner address is equal to msg.sender
-
-        MarketToken[] memory items = new MarketToken[](itemCount);
-        for (uint256 i = 0; i < totalItemCount; i++) {
-            if (idToMarketToken[i + 1].seller == msg.sender) {
-                uint256 currentId = idToMarketToken[i + 1].itemId;
-                MarketToken storage currentItem = idToMarketToken[currentId];
-                items[currentIndex] = currentItem;
-                currentIndex += 1;
-            }
-        }
         return items;
     }
 }

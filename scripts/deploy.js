@@ -4,13 +4,8 @@ const fs = require('fs')
 
 async function main() {
 
-  const Token = await hre.ethers.getContractFactory("OurToken");
-  const token = await Token.deploy();
-  await token.deployed();
-  console.log("token contract deployed to: ", token.address);
-
   const NFTMarket = await hre.ethers.getContractFactory("KBMarket");
-  const nftMarket = await NFTMarket.deploy(token.address);
+  const nftMarket = await NFTMarket.deploy();
   await nftMarket.deployed();
   console.log("nftMarket contract deployed to: ", nftMarket.address);
 
@@ -18,6 +13,11 @@ async function main() {
   const nft = await NFT.deploy(nftMarket.address);
   await nft.deployed();
   console.log("NFT contract deployed to: ", nftMarket.address);
+
+  const Token = await hre.ethers.getContractFactory("OurToken");
+  const token = await Token.deploy();
+  await token.deployed();
+  console.log("token contract deployed to: ", token.address);
 
 
   let config = `
