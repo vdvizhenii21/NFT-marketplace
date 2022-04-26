@@ -19,11 +19,18 @@ async function main() {
   await token.deployed();
   console.log("token contract deployed to: ", token.address);
 
+  const Stake = await hre.ethers.getContractFactory("NFTStaking");
+  const stake = await Stake.deploy(nft.address, token.address);
+  await stake.deployed();
+  console.log("stake contract deployed to: ", stake.address);
+
 
   let config = `
   export const nftmarketaddress = ${nftMarket.address}
   export const nftaddress = ${nft.address}
-  export const tokenaddress = ${token.address}`
+  export const tokenaddress = ${token.address}
+  export const stakeddress = ${stake.address}
+  `
 
   let data = JSON.stringify(config)
   fs.writeFileSync('config.js', JSON.parse(data))

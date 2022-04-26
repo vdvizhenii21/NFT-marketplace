@@ -3,11 +3,12 @@ import { useState } from 'react'
 import Web3Modal from 'web3modal'
 import { create as ipfsHttpClient } from 'ipfs-http-client'
 import {
-    nftaddress, nftmarketaddress, tokenaddress
+    nftaddress, nftmarketaddress, tokenaddress, stakeddress
 } from '../config'
 import NFT from '../artifacts/contracts/NFT.sol/NFT.json'
 import KBMarket from '../artifacts/contracts/KBMarket.sol/KBMarket.json'
 import OurToken from '../artifacts/contracts/OurToken.sol/OurToken.json'
+import NFTStaking from '../artifacts/contracts/NFTStaking.sol/NFTStaking.json'
 import { useRouter } from 'next/router'
 
 // in this component we set the ipfs up to host our nft data of
@@ -98,7 +99,7 @@ export default function MintItem() {
                     onChange={e => updateFormInput({ ...formInput, description: e.target.value })}
                 />
                 <input
-                    placeholder='Asset Price in Eth'
+                    placeholder='Asset Price in Tokens'
                     className='mt-2 border rounded p-4'
                     onChange={e => updateFormInput({ ...formInput, price: e.target.value })}
                 />
