@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract OurToken is ERC20 {
     constructor() ERC20("Liver", "LIV") {
-        _mint(0xbDA5747bFD65F08deb54cb465eB87D40e51B197E, 10000E18);
+        _mint(0x84FC865C43825c40f1558CDF58AB0f9707f0040c, 10000E18);
     }
 
     function mint(address to, uint256 amount) external {
