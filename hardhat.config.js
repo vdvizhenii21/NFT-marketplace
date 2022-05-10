@@ -1,9 +1,10 @@
+require('dotenv').config()
 require("@nomiclabs/hardhat-waffle");
 
 
-const ALCHEMY_API_KEY = "0PiPPBFmzGVfyoTCFHGnft5m-8Dk60RE";
+const ALCHEMY_API_URL = process.env.ALCHEMY_API_URL;
+const RINKEBY_PRIVATE_KEY = process.env.RINKEBY_PRIVATE_KEY;
 
-const RINKEBY_PRIVATE_KEY = "fddb20c0da1164e6000537b92596f2483a2a91c657fab1c88d1da1ca1c67465a";
 const projectId = '4dc5c4b05b664f0ab7610f1adb039c7c'
 const fs = require('fs')
 const keyData = fs.readFileSync('./p-key.txt', {
@@ -36,8 +37,8 @@ module.exports = {
   },
   networks: {
     rinkeby: {
-      url: `https://eth-rinkeby.alchemyapi.io/v2/${ALCHEMY_API_KEY}`,
-      accounts: [`${RINKEBY_PRIVATE_KEY}`]
+      url: ALCHEMY_API_URL,
+      accounts: [`0x${RINKEBY_PRIVATE_KEY}`]
     }
   }
 };

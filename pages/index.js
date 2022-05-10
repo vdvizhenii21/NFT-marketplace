@@ -3,6 +3,10 @@ import { useEffect, useState } from 'react'
 import axios from 'axios'
 import Web3Modal from 'web3modal'
 
+//const alchemyKey = process.env.REACT_APP_ALCHEMY_KEY
+//const { createAlchemyWeb3 } = require('@alch/alchemy-web3')
+//const web3 = createAlchemyWeb3(alchemyKey)
+
 import { nftaddress, nftmarketaddress, tokenaddress } from '../config'
 
 import NFT from '../artifacts/contracts/NFT.sol/NFT.json'
