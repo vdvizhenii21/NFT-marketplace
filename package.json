@@ -2,16 +2,15 @@
   "name": "nft-db2",
   "version": "0.1.0",
   "private": true,
-  "main": "index.js",
   "engines": {
     "node": "16.13.2",
     "npm": "6.14.15"
   },
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
   },
   "dependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.5",
