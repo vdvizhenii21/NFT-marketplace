@@ -2,6 +2,7 @@
   "name": "nft-db2",
   "version": "0.1.0",
   "private": true,
+  "main": "index.js",
   "engines": {
     "node": "16.13.2"
   },
