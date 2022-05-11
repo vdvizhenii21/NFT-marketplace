@@ -119,6 +119,9 @@ export default function MyAssets() {
                                 <div className='p-4 bg-black'>
                                     <p className='text-3x-1 mb-4 font-bold text-white'>{nft.price} Token</p>
                                 </div>
+                                <div className='p-4 bg-black'>
+                                    <p className='text-3x-1 mb-4 font-bold text-white'>NFT ID: {nft.tokenId}</p>
+                                </div>
                                 <button className='w-full bg-purple-500 text-white font-bold py-3 px-12 rounded'
                                     onClick={() => stakeit()} >stake
                                 </button>
