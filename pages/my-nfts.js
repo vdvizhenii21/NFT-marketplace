@@ -84,7 +84,7 @@ export default function MyAssets() {
         const signer = provider.getSigner()
         const nfstaking = new ethers.Contract(stakeddress, NFTStaking.abi, signer)
         const nft = new ethers.Contract(nftaddress, NFT.abi, signer)
-        const tx = await nfstaking.claim([1]);
+        const tx = await nfstaking.claim([2]);
         await tx.wait()
     }
     async function unstakeit() {
