@@ -70,7 +70,7 @@ export default function MyAssets() {
         //const accounts = await web3.eth.getAccounts();
         //const account = accounts[0];
         //const tokenids = Number(document.querySelector("[name=stkid]").value);
-        const tx0 = await nft.approve(stakeddress, 1);
+        const tx0 = await nft.approve(stakeddress, 2);
         await tx0.wait()
         const tx = await nfstaking.stake([2]);
         await tx.wait()
