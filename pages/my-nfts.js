@@ -72,7 +72,7 @@ export default function MyAssets() {
         //const tokenids = Number(document.querySelector("[name=stkid]").value);
         const tx0 = await nft.approve(stakeddress, 1);
         await tx0.wait()
-        const tx = await nfstaking.stake([1]);
+        const tx = await nfstaking.stake([2]);
         await tx.wait()
 
     }
