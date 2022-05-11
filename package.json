@@ -7,6 +7,9 @@
     "node": "16.13.2",
     "npm": "6.14.15"
   },
+  "cacheDirectories": [
+    ".next/cache"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
